@@ -5,13 +5,15 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "start:prod": "NODE_ENV=production LOG_LEVEL=info HEADLESS_MODE=true node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest",
     "init-db": "node scripts/init-db.js",
     "test:install": "node scripts/test-installation.js",
     "test:search": "node scripts/test-search.js",
     "test:apply": "node scripts/test-apply.js",
-    "test:proxy": "node scripts/test-proxy.js"
+    "test:proxy": "node scripts/test-proxy.js",
+    "postinstall": "npx --yes playwright install chromium"
   },
   "keywords": ["job-application", "automation", "web-scraping", "bot"],
   "author": "Your Name",

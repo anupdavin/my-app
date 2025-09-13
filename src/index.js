@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const JobApplicationBot = require('./core/JobApplicationBot');
 const DatabaseManager = require('./core/DatabaseManager');
+const UserDataManager = require('./core/UserDataManager');
 const Logger = require('./utils/Logger');
 const WebInterface = require('./web/WebInterface');
 
@@ -19,7 +20,7 @@ class Application {
         
         this.setupMiddleware();
         this.setupRoutes();
-        this.initializeDatabase();
+        // Database and dependent managers are initialized in start()
     }
 
     setupMiddleware() {
@@ -60,8 +61,16 @@ class Application {
 
     async start() {
         try {
-            // Start the web server first
-            this.app.listen(this.port, () => {
+            // Ensure database is ready before starting server
+            if (!this.db) {
+                await this.initializeDatabase();
+            }
+
+            // Initialize lightweight managers that don't require the browser
+            this.userDataManager = new UserDataManager(this.db);
+
+            // Start the web server
+            this.server = this.app.listen(this.port, () => {
                 this.logger.info(`Server running on port ${this.port}`);
                 this.logger.info(`Web interface available at http://localhost:${this.port}`);
             });
@@ -73,6 +82,10 @@ class Application {
                     await this.bot.initialize();
                     this.logger.info('Job Application Bot initialized successfully');
                     
+                    // Expose bot-managed services at app level for API routes
+                    this.userDataManager = this.bot.userDataManager;
+                    this.jobSearchManager = this.bot.jobSearchManager;
+
                     // Start the bot if auto-start is enabled
                     if (process.env.AUTO_START_BOT === 'true') {
                         await this.bot.start();
@@ -94,6 +107,9 @@ class Application {
         }
         if (this.db) {
             await this.db.close();
+        }
+        if (this.server) {
+            await new Promise(resolve => this.server.close(resolve));
         }
         this.logger.info('Application stopped');
     }

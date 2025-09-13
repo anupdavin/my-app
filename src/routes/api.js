@@ -22,9 +22,19 @@ const upload = multer({
 });
 
 // User Profile Management
-router.post('/users', async (req, res) => {
+router.post('/users', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 'coverLetter', maxCount: 1 }]), async (req, res) => {
     try {
-        const userData = req.body;
+        const userData = {
+            ...req.body,
+            resume: req.files?.resume ? {
+                originalname: req.files.resume[0].originalname,
+                buffer: req.files.resume[0].buffer
+            } : undefined,
+            coverLetter: req.files?.coverLetter ? {
+                originalname: req.files.coverLetter[0].originalname,
+                buffer: req.files.coverLetter[0].buffer
+            } : undefined
+        };
         const result = await global.app.userDataManager.createUserProfile(userData);
         res.json({
             success: true,
@@ -54,10 +64,20 @@ router.get('/users/:id', async (req, res) => {
     }
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', upload.fields([{ name: 'resume', maxCount: 1 }, { name: 'coverLetter', maxCount: 1 }]), async (req, res) => {
     try {
         const userId = req.params.id;
-        const userData = req.body;
+        const userData = {
+            ...req.body,
+            resume: req.files?.resume ? {
+                originalname: req.files.resume[0].originalname,
+                buffer: req.files.resume[0].buffer
+            } : undefined,
+            coverLetter: req.files?.coverLetter ? {
+                originalname: req.files.coverLetter[0].originalname,
+                buffer: req.files.coverLetter[0].buffer
+            } : undefined
+        };
         const result = await global.app.userDataManager.updateUserProfile(userId, userData);
         res.json({
             success: true,
@@ -172,7 +192,31 @@ router.get('/applications/:userId', async (req, res) => {
 router.get('/applications/stats/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
-        const stats = await global.app.bot.getApplicationStats(userId);
+        let stats;
+        if (global.app.bot) {
+            stats = await global.app.bot.getApplicationStats(userId);
+        } else {
+            // Fallback to DB stats if bot is not initialized yet
+            const userFilter = userId ? 'WHERE user_id = ?' : '';
+            const params = userId ? [userId] : [];
+            const db = global.app.db;
+            const summary = await db.getQuery(`
+                SELECT 
+                    COUNT(*) as total_applications,
+                    SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) as successful_applications,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_applications,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_applications
+                FROM job_applications 
+                ${userFilter}
+            `, params);
+            const recentApplications = await db.allQuery(`
+                SELECT * FROM job_applications 
+                ${userFilter}
+                ORDER BY applied_at DESC 
+                LIMIT 10
+            `, params);
+            stats = { ...summary, recentApplications };
+        }
         res.json({
             success: true,
             data: stats

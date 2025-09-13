@@ -4,6 +4,7 @@ const JobApplicationManager = require('./JobApplicationManager');
 const UserDataManager = require('./UserDataManager');
 const ProxyManager = require('./ProxyManager');
 const SessionManager = require('./SessionManager');
+const HumanBehaviorSimulator = require('./HumanBehaviorSimulator');
 const Logger = require('../utils/Logger');
 
 class JobApplicationBot {
@@ -19,6 +20,7 @@ class JobApplicationBot {
         this.isRunning = false;
         this.currentUser = null;
         this.currentSession = null;
+        this.humanSimulator = new HumanBehaviorSimulator();
     }
 
     async initialize() {
@@ -61,6 +63,12 @@ class JobApplicationBot {
             if (this.isRunning) {
                 this.logger.warn('Bot is already running');
                 return;
+            }
+
+            // Ensure bot is fully initialized (handles previous init failures)
+            if (!this.sessionManager || !this.userDataManager || !this.jobSearchManager || !this.applicationManager || !this.browser) {
+                this.logger.info('Bot not fully initialized, initializing now...');
+                await this.initialize();
             }
 
             this.isRunning = true;

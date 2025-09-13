@@ -25,47 +25,17 @@ class BrowserManager {
                 this.logger.warn('No proxy available, continuing without proxy');
             }
             
-            // Browser launch options
+            // Browser launch options (safe and production-ready)
             const launchOptions = {
-                headless: process.env.HEADLESS_MODE === 'true',
+                headless: process.env.HEADLESS_MODE ? process.env.HEADLESS_MODE === 'true' : true,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
                     '--disable-gpu',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                    '--disable-features=TranslateUI',
-                    '--disable-ipc-flooding-protection',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-images',
-                    '--disable-javascript',
-                    '--disable-default-apps',
-                    '--disable-sync',
-                    '--disable-translate',
-                    '--hide-scrollbars',
-                    '--mute-audio',
-                    '--no-default-browser-check',
-                    '--no-pings',
-                    '--no-sandbox',
-                    '--safebrowsing-disable-auto-update',
-                    '--disable-logging',
-                    '--disable-permissions-api',
-                    '--disable-presentation-api',
-                    '--disable-print-preview',
-                    '--disable-speech-api',
-                    '--hide-scrollbars',
-                    '--mute-audio',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
+                    '--mute-audio'
                 ]
             };
 

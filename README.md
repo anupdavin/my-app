@@ -342,3 +342,54 @@ For support and questions:
 - [ ] Advanced analytics dashboard
 - [ ] Integration with ATS systems
 - [ ] Resume optimization suggestions
+
+## Deployment
+
+### PM2 (recommended)
+
+1. Install PM2 globally
+```bash
+npm install -g pm2
+```
+
+2. Start the app
+```bash
+pm2 start ecosystem.config.js
+```
+
+3. View logs
+```bash
+pm2 logs job-application-bot
+```
+
+4. Enable startup on boot
+```bash
+pm2 startup && pm2 save
+```
+
+### Docker
+
+1. Build image
+```bash
+docker build -t job-app-bot:latest .
+```
+
+2. Run container
+```bash
+docker run -d \
+  --name job-app-bot \
+  -p 3000:3000 \
+  -e HEADLESS_MODE=true \
+  -e LOG_LEVEL=info \
+  job-app-bot:latest
+```
+
+3. Health check
+```bash
+curl http://localhost:3000/health
+```
+
+### Notes
+- First install downloads Playwright Chromium automatically (postinstall). If you deploy in restricted environments, run `npx playwright install chromium` during build.
+- The web UI is served from `http://localhost:3000`. Click Start to trigger `/api/bot/start`. Ensure Profile and Search Criteria are set.
+- Logs are written to `./logs/application.log` and console.

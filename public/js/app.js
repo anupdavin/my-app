@@ -637,5 +637,5 @@ class JobApplicationApp {
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new JobApplicationApp();
+    window.app = new JobApplicationApp();
 });

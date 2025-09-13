@@ -35,7 +35,10 @@ class WebInterface {
         // Bot control endpoints
         this.router.post('/api/bot/start', async (req, res) => {
             try {
-                const { userId } = req.body;
+                const { userId } = req.body || {};
+                if (!global.app.bot) {
+                    return res.status(503).json({ success: false, error: 'Bot not initialized' });
+                }
                 await global.app.bot.start(userId);
                 res.json({
                     success: true,
@@ -66,7 +69,12 @@ class WebInterface {
         
         this.router.get('/api/bot/status', async (req, res) => {
             try {
-                const status = await global.app.bot.getStatus();
+                const status = global.app.bot ? await global.app.bot.getStatus() : {
+                    isRunning: false,
+                    currentUser: null,
+                    currentSession: null,
+                    proxyStats: null
+                };
                 res.json({
                     success: true,
                     data: status

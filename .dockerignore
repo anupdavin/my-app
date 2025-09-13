@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+logs
+data
+uploads
+screenshots
+.env
+config.env
+config.env.example
