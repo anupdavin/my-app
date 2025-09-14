@@ -5,6 +5,7 @@ const UserDataManager = require('./UserDataManager');
 const ProxyManager = require('./ProxyManager');
 const SessionManager = require('./SessionManager');
 const Logger = require('../utils/Logger');
+const HumanBehaviorSimulator = require('./HumanBehaviorSimulator');
 
 class JobApplicationBot {
     constructor(databaseManager, logger) {
@@ -19,18 +20,33 @@ class JobApplicationBot {
         this.isRunning = false;
         this.currentUser = null;
         this.currentSession = null;
+        this.humanSimulator = new HumanBehaviorSimulator();
     }
 
     async initialize() {
         try {
             this.logger.info('Initializing Job Application Bot...');
             
+            // Load runtime settings from DB before initializing subsystems
+            try {
+                const minDelay = await this.db.getSetting('minDelayBetweenActions', process.env.MIN_DELAY_BETWEEN_ACTIONS || '2000');
+                const maxDelay = await this.db.getSetting('maxDelayBetweenActions', process.env.MAX_DELAY_BETWEEN_ACTIONS || '8000');
+                const headlessMode = await this.db.getSetting('headlessMode', process.env.HEADLESS_MODE || 'false');
+                const useProxyRotation = await this.db.getSetting('useProxyRotation', process.env.USE_PROXY_ROTATION || 'true');
+                process.env.MIN_DELAY_BETWEEN_ACTIONS = String(minDelay);
+                process.env.MAX_DELAY_BETWEEN_ACTIONS = String(maxDelay);
+                process.env.HEADLESS_MODE = String(headlessMode);
+                process.env.USE_PROXY_ROTATION = String(useProxyRotation);
+            } catch (e) {
+                this.logger.warn('Failed to load settings from DB, using defaults');
+            }
+
             // Initialize proxy manager
             this.proxyManager = new ProxyManager(this.db, this.logger);
             await this.proxyManager.initialize();
             
-            // Initialize user data manager
-            this.userDataManager = new UserDataManager(this.db);
+            // Initialize user data manager (reuse if provided by app)
+            this.userDataManager = this.userDataManager || new UserDataManager(this.db);
             
             // Initialize browser manager
             this.browser = new BrowserManager(this.logger, this.proxyManager);

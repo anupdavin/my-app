@@ -8,6 +8,7 @@ const JobApplicationBot = require('./core/JobApplicationBot');
 const DatabaseManager = require('./core/DatabaseManager');
 const Logger = require('./utils/Logger');
 const WebInterface = require('./web/WebInterface');
+const UserDataManager = require('./core/UserDataManager');
 
 class Application {
     constructor() {
@@ -52,6 +53,10 @@ class Application {
             this.db = new DatabaseManager();
             await this.db.initialize();
             this.logger.info('Database initialized successfully');
+
+            // Attach managers early so routes can use them even before bot init
+            this.userDataManager = new UserDataManager(this.db);
+            this.jobSearchManager = null; // will be set by bot
         } catch (error) {
             this.logger.error('Failed to initialize database:', error);
             process.exit(1);
@@ -70,7 +75,11 @@ class Application {
             setTimeout(async () => {
                 try {
                     this.bot = new JobApplicationBot(this.db, this.logger);
+                    // Share the same userDataManager instance with the bot
+                    this.bot.userDataManager = this.userDataManager;
                     await this.bot.initialize();
+                    // Expose jobSearchManager provided by bot for routes if needed
+                    this.jobSearchManager = this.bot.jobSearchManager;
                     this.logger.info('Job Application Bot initialized successfully');
                     
                     // Start the bot if auto-start is enabled

@@ -22,9 +22,22 @@ const upload = multer({
 });
 
 // User Profile Management
-router.post('/users', async (req, res) => {
+// Create user profile (supports JSON or multipart form-data with files)
+router.post('/users', upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+]), async (req, res) => {
     try {
-        const userData = req.body;
+        const userData = req.body || {};
+        // Attach files if present
+        if (req.files) {
+            if (req.files.resume && req.files.resume[0]) {
+                userData.resume = req.files.resume[0];
+            }
+            if (req.files.coverLetter && req.files.coverLetter[0]) {
+                userData.coverLetter = req.files.coverLetter[0];
+            }
+        }
         const result = await global.app.userDataManager.createUserProfile(userData);
         res.json({
             success: true,
@@ -54,10 +67,23 @@ router.get('/users/:id', async (req, res) => {
     }
 });
 
-router.put('/users/:id', async (req, res) => {
+// Update user profile (supports JSON or multipart form-data with files)
+router.put('/users/:id', upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+]), async (req, res) => {
     try {
         const userId = req.params.id;
-        const userData = req.body;
+        const userData = req.body || {};
+        // Attach files if present
+        if (req.files) {
+            if (req.files.resume && req.files.resume[0]) {
+                userData.resume = req.files.resume[0];
+            }
+            if (req.files.coverLetter && req.files.coverLetter[0]) {
+                userData.coverLetter = req.files.coverLetter[0];
+            }
+        }
         const result = await global.app.userDataManager.updateUserProfile(userId, userData);
         res.json({
             success: true,
@@ -172,6 +198,28 @@ router.get('/applications/:userId', async (req, res) => {
 router.get('/applications/stats/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
+        // If bot not initialized yet, compute directly from DB as fallback
+        if (!global.app.bot) {
+            const db = global.app.db;
+            const userIdFilter = 'WHERE user_id = ?';
+            const params = [userId];
+            const stats = await db.getQuery(`
+                SELECT 
+                    COUNT(*) as total_applications,
+                    SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) as successful_applications,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_applications,
+                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_applications
+                FROM job_applications 
+                ${userIdFilter}
+            `, params);
+            const recentApplications = await db.allQuery(`
+                SELECT * FROM job_applications 
+                ${userIdFilter}
+                ORDER BY applied_at DESC 
+                LIMIT 10
+            `, params);
+            return res.json({ success: true, data: { ...stats, recentApplications } });
+        }
         const stats = await global.app.bot.getApplicationStats(userId);
         res.json({
             success: true,

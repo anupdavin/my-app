@@ -637,5 +637,6 @@ class JobApplicationApp {
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new JobApplicationApp();
+    // Expose globally for inline onclick handlers in HTML (e.g., Setup Wizard buttons)
+    window.app = new JobApplicationApp();
 });

@@ -223,13 +223,8 @@ class LinkedInApplicationStrategy extends BaseApplicationStrategy {
 
     async fillField(browser, selector, value) {
         try {
-            const element = await browser.page.$(selector);
-            if (element) {
-                await element.fill('');
-                await browser.humanSimulator.randomDelay(200, 500);
-                await element.type(value, { delay: browser.humanSimulator.getTypingDelay() });
-                await browser.humanSimulator.randomDelay(500, 1000);
-            }
+            await browser.fillForm(selector, value);
+            await browser.humanSimulator.randomDelay(500, 1000);
         } catch (error) {
             this.logger?.warn(`Failed to fill field ${selector}:`, error);
         }
