@@ -174,8 +174,8 @@ class BrowserManager {
             await this.humanSimulator.randomDelay(1000, 3000);
             
             const response = await this.page.goto(url, {
-                waitUntil: 'networkidle',
-                timeout: 30000,
+                waitUntil: options.waitUntil || 'domcontentloaded',
+                timeout: options.timeout || 60000,
                 ...options
             });
 
@@ -192,7 +192,7 @@ class BrowserManager {
 
     async clickElement(selector, options = {}) {
         try {
-            await this.page.waitForSelector(selector, { timeout: 10000 });
+            await this.page.waitForSelector(selector, { timeout: 20000 });
             
             // Simulate human behavior before clicking
             await this.humanSimulator.randomDelay(500, 1500);
@@ -212,7 +212,7 @@ class BrowserManager {
 
     async fillForm(selector, value, options = {}) {
         try {
-            await this.page.waitForSelector(selector, { timeout: 10000 });
+            await this.page.waitForSelector(selector, { timeout: 20000 });
             
             // Clear existing value
             await this.page.fill(selector, '');
@@ -230,7 +230,7 @@ class BrowserManager {
 
     async selectOption(selector, value) {
         try {
-            await this.page.waitForSelector(selector, { timeout: 10000 });
+            await this.page.waitForSelector(selector, { timeout: 20000 });
             await this.page.selectOption(selector, value);
             this.logger.debug(`Selected option: ${selector} = ${value}`);
         } catch (error) {
@@ -250,7 +250,7 @@ class BrowserManager {
         }
     }
 
-    async waitForElement(selector, timeout = 10000) {
+    async waitForElement(selector, timeout = 20000) {
         try {
             await this.page.waitForSelector(selector, { timeout });
             return true;

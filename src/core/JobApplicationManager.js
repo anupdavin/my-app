@@ -23,6 +23,16 @@ class JobApplicationManager {
             
             const strategy = this.applicationStrategies[job.jobBoard];
             if (!strategy) {
+                // Support simulated jobs: mark as applied successfully without navigation
+                if (job.jobBoard === 'simulated') {
+                    await this.humanSimulator.randomDelay(500, 1500);
+                    return {
+                        success: true,
+                        jobId: job.id,
+                        appliedAt: new Date().toISOString(),
+                        result: { submitted: true, success: true, simulation: true }
+                    };
+                }
                 throw new Error(`No application strategy for job board: ${job.jobBoard}`);
             }
 

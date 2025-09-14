@@ -253,6 +253,14 @@ router.post('/bot/start', async (req, res) => {
                 error: 'Bot not initialized yet. Please wait a moment and try again.'
             });
         }
+        // Ensure bot is fully initialized (session manager present)
+        if (!global.app.bot.sessionManager) {
+            try {
+                await global.app.bot.initialize();
+            } catch (e) {
+                return res.status(500).json({ success: false, error: `Failed to initialize bot: ${e.message}` });
+            }
+        }
         const { userId } = req.body;
         await global.app.bot.start(userId);
         res.json({

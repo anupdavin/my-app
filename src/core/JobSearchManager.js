@@ -6,6 +6,7 @@ class JobSearchManager {
         this.browser = browserManager;
         this.logger = logger;
         this.humanSimulator = new HumanBehaviorSimulator();
+        this.simulationMode = (process.env.SIMULATION_MODE || 'false') === 'true';
         this.jobBoards = {
             linkedin: new LinkedInJobBoard(),
             indeed: new IndeedJobBoard(),
@@ -20,6 +21,21 @@ class JobSearchManager {
             const allJobs = [];
 
             this.logger.info(`Starting job search for: ${jobTitle} in ${location}`);
+
+            if (this.simulationMode) {
+                // Generate mock jobs without external navigation
+                const mockJobs = Array.from({ length: 5 }).map((_, idx) => ({
+                    title: `${jobTitle} (${idx + 1})`,
+                    company: 'Simulated Company',
+                    location: location || 'Remote',
+                    url: `https://example.com/job/${Date.now()}-${idx}`,
+                    jobBoard: 'simulated',
+                    postedDate: new Date().toISOString(),
+                    hasApplyButton: true
+                }));
+                this.logger.info(`Simulation mode: generated ${mockJobs.length} jobs`);
+                return mockJobs;
+            }
 
             for (const boardName of jobBoards) {
                 try {

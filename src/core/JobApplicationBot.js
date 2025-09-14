@@ -34,10 +34,12 @@ class JobApplicationBot {
                 const maxDelay = await this.db.getSetting('maxDelayBetweenActions', process.env.MAX_DELAY_BETWEEN_ACTIONS || '8000');
                 const headlessMode = await this.db.getSetting('headlessMode', process.env.HEADLESS_MODE || 'false');
                 const useProxyRotation = await this.db.getSetting('useProxyRotation', process.env.USE_PROXY_ROTATION || 'true');
+                const simulationMode = process.env.SIMULATION_MODE || 'true';
                 process.env.MIN_DELAY_BETWEEN_ACTIONS = String(minDelay);
                 process.env.MAX_DELAY_BETWEEN_ACTIONS = String(maxDelay);
                 process.env.HEADLESS_MODE = String(headlessMode);
                 process.env.USE_PROXY_ROTATION = String(useProxyRotation);
+                process.env.SIMULATION_MODE = String(simulationMode);
             } catch (e) {
                 this.logger.warn('Failed to load settings from DB, using defaults');
             }
@@ -81,6 +83,11 @@ class JobApplicationBot {
             if (this.isRunning) {
                 this.logger.warn('Bot is already running');
                 return;
+            }
+
+            // Ensure core managers exist; if not, initialize
+            if (!this.sessionManager || !this.userDataManager || !this.jobSearchManager || !this.applicationManager || !this.browser) {
+                await this.initialize();
             }
 
             this.isRunning = true;
