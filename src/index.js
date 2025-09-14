@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const JobApplicationBot = require('./core/JobApplicationBot');
 const DatabaseManager = require('./core/DatabaseManager');
+const UserDataManager = require('./core/UserDataManager');
 const Logger = require('./utils/Logger');
 const WebInterface = require('./web/WebInterface');
 
@@ -15,11 +16,13 @@ class Application {
         this.port = process.env.PORT || 3000;
         this.bot = null;
         this.db = null;
+        this.userDataManager = null;
         this.logger = new Logger();
         
         this.setupMiddleware();
         this.setupRoutes();
-        this.initializeDatabase();
+        // Kick off DB init but don't block constructor; wait in start()
+        this.dbReady = this.initializeDatabase();
     }
 
     setupMiddleware() {
@@ -51,6 +54,8 @@ class Application {
         try {
             this.db = new DatabaseManager();
             await this.db.initialize();
+            // Expose user data manager early for API routes
+            this.userDataManager = new UserDataManager(this.db);
             this.logger.info('Database initialized successfully');
         } catch (error) {
             this.logger.error('Failed to initialize database:', error);
@@ -60,7 +65,10 @@ class Application {
 
     async start() {
         try {
-            // Start the web server first
+            // Ensure database is initialized before accepting requests
+            await this.dbReady;
+
+            // Start the web server
             this.app.listen(this.port, () => {
                 this.logger.info(`Server running on port ${this.port}`);
                 this.logger.info(`Web interface available at http://localhost:${this.port}`);
@@ -69,8 +77,16 @@ class Application {
             // Initialize the job application bot after server starts
             setTimeout(async () => {
                 try {
-                    this.bot = new JobApplicationBot(this.db, this.logger);
-                    await this.bot.initialize();
+                    const bot = new JobApplicationBot(this.db, this.logger);
+                    await bot.initialize();
+                    this.bot = bot;
+                    // Keep shared managers in sync for routes that use global.app
+                    if (bot.userDataManager) {
+                        this.userDataManager = bot.userDataManager;
+                    }
+                    if (bot.jobSearchManager) {
+                        this.jobSearchManager = bot.jobSearchManager;
+                    }
                     this.logger.info('Job Application Bot initialized successfully');
                     
                     // Start the bot if auto-start is enabled

@@ -54,10 +54,23 @@ router.get('/users/:id', async (req, res) => {
     }
 });
 
-router.put('/users/:id', async (req, res) => {
+// Accept both JSON and multipart form data
+const profileUpload = upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+]);
+
+router.put('/users/:id', profileUpload, async (req, res) => {
     try {
         const userId = req.params.id;
-        const userData = req.body;
+        const userData = { ...req.body };
+        // Attach uploaded files if present
+        if (req.files && req.files.resume && req.files.resume[0]) {
+            userData.resume = req.files.resume[0];
+        }
+        if (req.files && req.files.coverLetter && req.files.coverLetter[0]) {
+            userData.coverLetter = req.files.coverLetter[0];
+        }
         const result = await global.app.userDataManager.updateUserProfile(userId, userData);
         res.json({
             success: true,
@@ -172,6 +185,18 @@ router.get('/applications/:userId', async (req, res) => {
 router.get('/applications/stats/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
+        if (!global.app.bot) {
+            return res.json({
+                success: true,
+                data: {
+                    total_applications: 0,
+                    successful_applications: 0,
+                    failed_applications: 0,
+                    pending_applications: 0,
+                    recentApplications: []
+                }
+            });
+        }
         const stats = await global.app.bot.getApplicationStats(userId);
         res.json({
             success: true,
@@ -302,6 +327,9 @@ router.get('/bot/status', async (req, res) => {
 router.post('/jobs/search', async (req, res) => {
     try {
         const criteria = req.body;
+        if (!global.app.jobSearchManager && global.app.bot && global.app.bot.jobSearchManager) {
+            global.app.jobSearchManager = global.app.bot.jobSearchManager;
+        }
         const jobs = await global.app.jobSearchManager.searchJobs(criteria);
         res.json({
             success: true,

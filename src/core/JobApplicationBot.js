@@ -5,6 +5,7 @@ const UserDataManager = require('./UserDataManager');
 const ProxyManager = require('./ProxyManager');
 const SessionManager = require('./SessionManager');
 const Logger = require('../utils/Logger');
+const HumanBehaviorSimulator = require('./HumanBehaviorSimulator');
 
 class JobApplicationBot {
     constructor(databaseManager, logger) {
@@ -19,6 +20,7 @@ class JobApplicationBot {
         this.isRunning = false;
         this.currentUser = null;
         this.currentSession = null;
+        this.humanSimulator = new HumanBehaviorSimulator();
     }
 
     async initialize() {

@@ -130,7 +130,7 @@ class LinkedInJobBoard extends BaseJobBoard {
                 jobs.push(...pageJobs);
                 
                 // Check if there's a next page
-                const hasNextPage = await browser.waitForElement(browser.page, this.searchSelectors.nextPageButton);
+                const hasNextPage = await browser.waitForElement(this.searchSelectors.nextPageButton);
                 if (!hasNextPage || pageJobs.length === 0) {
                     break;
                 }
@@ -265,7 +265,7 @@ class IndeedJobBoard extends BaseJobBoard {
                 const pageJobs = await this.extractJobListings(browser);
                 jobs.push(...pageJobs);
                 
-                const hasNextPage = await browser.waitForElement(browser.page, this.searchSelectors.nextPageButton);
+                const hasNextPage = await browser.waitForElement(this.searchSelectors.nextPageButton);
                 if (!hasNextPage || pageJobs.length === 0) {
                     break;
                 }

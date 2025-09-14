@@ -25,9 +25,9 @@ class BrowserManager {
                 this.logger.warn('No proxy available, continuing without proxy');
             }
             
-            // Browser launch options
+            // Browser launch options (default headless false so users can see the browser unless overridden)
             const launchOptions = {
-                headless: process.env.HEADLESS_MODE === 'true',
+                headless: (process.env.HEADLESS_MODE || 'false').toLowerCase() === 'true',
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -41,12 +41,9 @@ class BrowserManager {
                     '--disable-renderer-backgrounding',
                     '--disable-features=TranslateUI',
                     '--disable-ipc-flooding-protection',
-                    '--disable-web-security',
                     '--disable-features=VizDisplayCompositor',
                     '--disable-extensions',
                     '--disable-plugins',
-                    '--disable-images',
-                    '--disable-javascript',
                     '--disable-default-apps',
                     '--disable-sync',
                     '--disable-translate',
