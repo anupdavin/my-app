@@ -24,6 +24,8 @@ class DatabaseManager {
             
             // Create tables
             await this.createTables();
+            // Run lightweight migrations to add new columns as needed
+            await this.runMigrations();
             
             console.log('Database initialized successfully');
         } catch (error) {
@@ -111,6 +113,33 @@ class DatabaseManager {
         }
     }
 
+    async runMigrations() {
+        try {
+            // Ensure search_criteria.job_boards column exists
+            const hasJobBoards = await this.columnExists('search_criteria', 'job_boards');
+            if (!hasJobBoards) {
+                await this.runQuery(`ALTER TABLE search_criteria ADD COLUMN job_boards TEXT`);
+            }
+            // Ensure user_profiles.location column exists
+            const hasLocation = await this.columnExists('user_profiles', 'location');
+            if (!hasLocation) {
+                await this.runQuery(`ALTER TABLE user_profiles ADD COLUMN location TEXT`);
+            }
+        } catch (error) {
+            // Log and continue; do not crash app on migration failure
+            console.warn('Database migration warning:', error.message);
+        }
+    }
+
+    columnExists(table, column) {
+        return new Promise((resolve, reject) => {
+            this.db.all(`PRAGMA table_info(${table})`, [], (err, rows) => {
+                if (err) return reject(err);
+                resolve(rows.some(r => r.name === column));
+            });
+        });
+    }
+
     runQuery(sql, params = []) {
         return new Promise((resolve, reject) => {
             this.db.run(sql, params, function(err) {
@@ -149,10 +178,10 @@ class DatabaseManager {
 
     // User profile methods
     async createUserProfile(userData) {
-        const { name, email, phone, resumePath, coverLetterPath } = userData;
-        const sql = `INSERT INTO user_profiles (name, email, phone, resume_path, cover_letter_path) 
-                     VALUES (?, ?, ?, ?, ?)`;
-        return await this.runQuery(sql, [name, email, phone, resumePath, coverLetterPath]);
+        const { name, email, phone, location, resumePath, coverLetterPath } = userData;
+        const sql = `INSERT INTO user_profiles (name, email, phone, location, resume_path, cover_letter_path) 
+                     VALUES (?, ?, ?, ?, ?, ?)`;
+        return await this.runQuery(sql, [name, email, phone, location || null, resumePath, coverLetterPath]);
     }
 
     async getUserProfile(userId) {
@@ -161,12 +190,12 @@ class DatabaseManager {
     }
 
     async updateUserProfile(userId, userData) {
-        const { name, email, phone, resumePath, coverLetterPath } = userData;
+        const { name, email, phone, location, resumePath, coverLetterPath } = userData;
         const sql = `UPDATE user_profiles 
-                     SET name = ?, email = ?, phone = ?, resume_path = ?, cover_letter_path = ?, 
+                     SET name = ?, email = ?, phone = ?, location = ?, resume_path = ?, cover_letter_path = ?, 
                          updated_at = CURRENT_TIMESTAMP 
                      WHERE id = ?`;
-        return await this.runQuery(sql, [name, email, phone, resumePath, coverLetterPath, userId]);
+        return await this.runQuery(sql, [name, email, phone, location || null, resumePath, coverLetterPath, userId]);
     }
 
     // Job application methods
@@ -194,15 +223,23 @@ class DatabaseManager {
 
     // Search criteria methods
     async createSearchCriteria(criteriaData) {
-        const { userId, jobTitle, location, industry, keywords, salaryMin, salaryMax } = criteriaData;
-        const sql = `INSERT INTO search_criteria (user_id, job_title, location, industry, keywords, salary_min, salary_max) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`;
-        return await this.runQuery(sql, [userId, jobTitle, location, industry, keywords, salaryMin, salaryMax]);
+        const { userId, jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards } = criteriaData;
+        const sql = `INSERT INTO search_criteria (user_id, job_title, location, industry, keywords, salary_min, salary_max, job_boards) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        return await this.runQuery(sql, [userId, jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards || null]);
     }
 
     async getActiveSearchCriteria(userId) {
         const sql = `SELECT * FROM search_criteria WHERE user_id = ? AND is_active = 1`;
         return await this.allQuery(sql, [userId]);
+    }
+
+    async updateActiveSearchCriteria(userId, criteriaData) {
+        const { jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards } = criteriaData;
+        const sql = `UPDATE search_criteria 
+                     SET job_title = ?, location = ?, industry = ?, keywords = ?, salary_min = ?, salary_max = ?, job_boards = ?, created_at = created_at
+                     WHERE user_id = ? AND is_active = 1`;
+        return await this.runQuery(sql, [jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards || null, userId]);
     }
 
     // Proxy management methods

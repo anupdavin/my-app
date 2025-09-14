@@ -175,6 +175,17 @@ router.get('/search-criteria/:userId', async (req, res) => {
     }
 });
 
+// Upsert (create or update) search criteria
+router.put('/search-criteria/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const updated = await global.app.userDataManager.upsertSearchCriteria(userId, req.body || {});
+        res.json({ success: true, data: updated });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
 // Job Applications
 router.get('/applications/:userId', async (req, res) => {
     try {
@@ -326,6 +337,8 @@ router.get('/bot/status', async (req, res) => {
                 success: true,
                 data: {
                     isRunning: false,
+                    paused: false,
+                    state: 'initializing',
                     currentUser: null,
                     currentSession: null,
                     proxyStats: null,
@@ -391,6 +404,21 @@ router.post('/proxies/validate', async (req, res) => {
             success: false,
             error: error.message
         });
+    }
+});
+
+// Add proxies in bulk
+router.post('/proxies', async (req, res) => {
+    try {
+        const { proxies = [] } = req.body || {};
+        const results = [];
+        for (const proxy of proxies) {
+            const ok = await global.app.bot.proxyManager.addProxy(proxy);
+            results.push({ proxy, added: ok });
+        }
+        res.json({ success: true, data: results });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
     }
 });
 

@@ -34,6 +34,19 @@ class JobApplicationApp {
             this.stopBot();
         });
 
+        const pauseBtn = document.getElementById('pause-bot');
+        const resumeBtn = document.getElementById('resume-bot');
+        if (pauseBtn) {
+            pauseBtn.addEventListener('click', () => {
+                this.pauseBot();
+            });
+        }
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', () => {
+                this.resumeBot();
+            });
+        }
+
         // Forms
         document.getElementById('profile-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -44,6 +57,13 @@ class JobApplicationApp {
             e.preventDefault();
             this.saveSearchCriteria();
         });
+
+        const previewBtn = document.getElementById('preview-search');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', () => {
+                this.previewSearch();
+            });
+        }
 
         document.getElementById('settings-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -181,17 +201,30 @@ class JobApplicationApp {
                 const statusText = document.getElementById('status-text');
                 const startBtn = document.getElementById('start-bot');
                 const stopBtn = document.getElementById('stop-bot');
+                const pauseBtn = document.getElementById('pause-bot');
+                const resumeBtn = document.getElementById('resume-bot');
 
-                if (status.isRunning) {
+                if (status.paused) {
+                    statusIndicator.className = 'status-indicator status-paused';
+                    statusText.textContent = 'Paused';
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    if (pauseBtn) pauseBtn.disabled = true;
+                    if (resumeBtn) resumeBtn.disabled = false;
+                } else if (status.isRunning) {
                     statusIndicator.className = 'status-indicator status-running';
                     statusText.textContent = 'Running';
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
+                    if (pauseBtn) pauseBtn.disabled = false;
+                    if (resumeBtn) resumeBtn.disabled = true;
                 } else {
                     statusIndicator.className = 'status-indicator status-stopped';
                     statusText.textContent = 'Stopped';
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
+                    if (pauseBtn) pauseBtn.disabled = true;
+                    if (resumeBtn) resumeBtn.disabled = true;
                 }
             }
         } catch (error) {
@@ -321,6 +354,16 @@ class JobApplicationApp {
                 document.getElementById('keywords').value = criteria.keywords || '';
                 document.getElementById('salary-min').value = criteria.salary_min || '';
                 document.getElementById('salary-max').value = criteria.salary_max || '';
+
+                const boardsCsv = criteria.job_boards || criteria.jobBoards || '';
+                const selectedBoards = new Set((boardsCsv || '').split(',').map(s => s.trim()).filter(Boolean));
+                const boardIds = ['board-linkedin','board-indeed','board-glassdoor','board-monster'];
+                boardIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.checked = selectedBoards.size > 0 ? selectedBoards.has(el.value) : (el.value === 'linkedin' || el.value === 'indeed');
+                    }
+                });
             }
         } catch (error) {
             console.error('Failed to load search criteria:', error);
@@ -329,6 +372,7 @@ class JobApplicationApp {
 
     async saveSearchCriteria() {
         try {
+            const selectedBoards = Array.from(document.querySelectorAll('#search-form .form-check-input:checked')).map(cb => cb.value);
             const criteria = {
                 userId: 1,
                 jobTitle: document.getElementById('job-title').value,
@@ -336,11 +380,13 @@ class JobApplicationApp {
                 industry: document.getElementById('industry').value,
                 keywords: document.getElementById('keywords').value,
                 salaryMin: document.getElementById('salary-min').value,
-                salaryMax: document.getElementById('salary-max').value
+                salaryMax: document.getElementById('salary-max').value,
+                jobBoards: selectedBoards
             };
 
-            const response = await fetch('/api/search-criteria', {
-                method: 'POST',
+            // Upsert criteria for user
+            const response = await fetch('/api/search-criteria/1', {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -358,6 +404,106 @@ class JobApplicationApp {
             }
         } catch (error) {
             this.showAlert(`Error saving search criteria: ${error.message}`, 'danger');
+        }
+    }
+
+    async previewSearch() {
+        try {
+            const selectedBoards = Array.from(document.querySelectorAll('#search-form .form-check-input:checked')).map(cb => cb.value);
+            const criteria = {
+                jobTitle: document.getElementById('job-title').value,
+                location: document.getElementById('job-location').value,
+                industry: document.getElementById('industry').value,
+                keywords: document.getElementById('keywords').value,
+                salaryMin: document.getElementById('salary-min').value,
+                salaryMax: document.getElementById('salary-max').value,
+                jobBoards: selectedBoards
+            };
+
+            const response = await fetch('/api/jobs/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(criteria)
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.showJobsPreviewModal(data.data || []);
+            } else {
+                this.showAlert(`Failed to preview jobs: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            this.showAlert(`Error previewing jobs: ${error.message}`, 'danger');
+        }
+    }
+
+    showJobsPreviewModal(jobs) {
+        const modalHtml = `
+            <div class="modal fade" id="jobsPreviewModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-secondary text-white">
+                            <h5 class="modal-title"><i class="fas fa-eye"></i> Preview Results</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            ${jobs.length === 0 ? '<p class="text-muted">No jobs found</p>' : jobs.map(job => `
+                                <div class="application-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="mb-1">${job.title || ''}</h6>
+                                            <p class="mb-1 text-muted">${job.company || ''}</p>
+                                            <small class="text-muted">${job.jobBoard || job.job_board || ''} • ${job.location || ''}</small>
+                                        </div>
+                                        <a href="${job.url}" target="_blank" class="btn btn-outline-primary btn-sm">Open</a>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const existingModal = document.getElementById('jobsPreviewModal');
+        if (existingModal) existingModal.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        setTimeout(() => {
+            const modalElement = document.getElementById('jobsPreviewModal');
+            if (modalElement && window.bootstrap) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            }
+        }, 100);
+    }
+
+    async pauseBot() {
+        try {
+            const response = await fetch('/api/bot/pause', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                this.updateBotStatus();
+            } else {
+                this.showAlert(`Failed to pause bot: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            this.showAlert(`Error pausing bot: ${error.message}`, 'danger');
+        }
+    }
+
+    async resumeBot() {
+        try {
+            const response = await fetch('/api/bot/resume', { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                this.updateBotStatus();
+            } else {
+                this.showAlert(`Failed to resume bot: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            this.showAlert(`Error resuming bot: ${error.message}`, 'danger');
         }
     }
 
@@ -414,6 +560,8 @@ class JobApplicationApp {
                 document.getElementById('min-delay').value = settings.minDelayBetweenActions;
                 document.getElementById('max-delay').value = settings.maxDelayBetweenActions;
                 document.getElementById('headless-mode').checked = settings.headlessMode === 'true';
+                const proxyToggle = document.getElementById('use-proxy-rotation');
+                if (proxyToggle) proxyToggle.checked = settings.useProxyRotation === 'true';
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -426,7 +574,8 @@ class JobApplicationApp {
                 maxApplicationsPerSession: document.getElementById('max-applications').value,
                 minDelayBetweenActions: document.getElementById('min-delay').value,
                 maxDelayBetweenActions: document.getElementById('max-delay').value,
-                headlessMode: document.getElementById('headless-mode').checked.toString()
+                headlessMode: document.getElementById('headless-mode').checked.toString(),
+                useProxyRotation: (document.getElementById('use-proxy-rotation')?.checked ? 'true' : 'false')
             };
 
             const response = await fetch('/api/settings', {
@@ -446,6 +595,32 @@ class JobApplicationApp {
             }
         } catch (error) {
             this.showAlert(`Error saving settings: ${error.message}`, 'danger');
+        }
+    }
+
+    async addProxiesFromTextarea() {
+        try {
+            const textarea = document.getElementById('proxies-textarea');
+            if (!textarea) return;
+            const proxies = textarea.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (proxies.length === 0) {
+                this.showAlert('No proxies provided', 'warning');
+                return;
+            }
+            const response = await fetch('/api/proxies', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proxies })
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.showAlert(`Added ${data.data.filter(r => r.added).length} proxies`, 'success');
+                textarea.value = '';
+            } else {
+                this.showAlert(`Failed to add proxies: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            this.showAlert(`Error adding proxies: ${error.message}`, 'danger');
         }
     }
 

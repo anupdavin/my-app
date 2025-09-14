@@ -66,7 +66,7 @@ class UserDataManager {
 
     async createUserProfile(userData) {
         try {
-            const { name, email, phone, resume, coverLetter } = userData;
+            const { name, email, phone, location, resume, coverLetter } = userData;
             
             // Validate required fields
             if (!name || !email) {
@@ -101,6 +101,7 @@ class UserDataManager {
                 name,
                 email,
                 phone,
+                location,
                 resumePath,
                 coverLetterPath
             });
@@ -110,6 +111,7 @@ class UserDataManager {
                 name,
                 email,
                 phone,
+                location,
                 resumePath,
                 coverLetterPath
             };
@@ -120,7 +122,7 @@ class UserDataManager {
 
     async updateUserProfile(userId, userData) {
         try {
-            const { name, email, phone, resume, coverLetter } = userData;
+            const { name, email, phone, location, resume, coverLetter } = userData;
             
             // Get existing user data
             const existingUser = await this.db.getUserProfile(userId);
@@ -154,6 +156,7 @@ class UserDataManager {
                 name: name || existingUser.name,
                 email: email || existingUser.email,
                 phone: phone || existingUser.phone,
+                location: location || existingUser.location,
                 resumePath,
                 coverLetterPath
             });
@@ -212,11 +215,14 @@ class UserDataManager {
 
     async createSearchCriteria(userId, criteria) {
         try {
-            const { jobTitle, location, industry, keywords, salaryMin, salaryMax } = criteria;
+            const { jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards } = criteria;
             
             if (!jobTitle) {
                 throw new Error('Job title is required');
             }
+
+            // Normalize job boards to CSV string
+            const boardsCsv = Array.isArray(jobBoards) ? jobBoards.join(',') : (jobBoards || null);
 
             const result = await this.db.createSearchCriteria({
                 userId,
@@ -225,7 +231,8 @@ class UserDataManager {
                 industry,
                 keywords,
                 salaryMin,
-                salaryMax
+                salaryMax,
+                jobBoards: boardsCsv
             });
 
             return {
@@ -235,7 +242,8 @@ class UserDataManager {
                 industry,
                 keywords,
                 salaryMin,
-                salaryMax
+                salaryMax,
+                jobBoards: boardsCsv
             };
         } catch (error) {
             throw new Error(`Failed to create search criteria: ${error.message}`);
@@ -248,6 +256,26 @@ class UserDataManager {
         } catch (error) {
             throw new Error(`Failed to get search criteria: ${error.message}`);
         }
+    }
+
+    async upsertSearchCriteria(userId, criteria) {
+        const existing = await this.getSearchCriteria(userId);
+        if (existing && existing.length > 0) {
+            const { jobTitle, location, industry, keywords, salaryMin, salaryMax, jobBoards } = criteria;
+            const boardsCsv = Array.isArray(jobBoards) ? jobBoards.join(',') : (jobBoards || null);
+            await this.db.updateActiveSearchCriteria(userId, {
+                jobTitle,
+                location,
+                industry,
+                keywords,
+                salaryMin,
+                salaryMax,
+                jobBoards: boardsCsv
+            });
+            return await this.getSearchCriteria(userId);
+        }
+        await this.createSearchCriteria(userId, criteria);
+        return await this.getSearchCriteria(userId);
     }
 
     async deleteUserData(userId) {

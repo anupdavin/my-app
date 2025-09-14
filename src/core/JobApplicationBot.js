@@ -21,6 +21,7 @@ class JobApplicationBot {
         this.currentUser = null;
         this.currentSession = null;
         this.humanSimulator = new HumanBehaviorSimulator();
+        this.paused = false;
     }
 
     async initialize() {
@@ -40,6 +41,9 @@ class JobApplicationBot {
             } catch (e) {
                 this.logger.warn('Failed to load settings from DB, using defaults');
             }
+
+            // Recreate human simulator with updated env-based settings
+            this.humanSimulator = new HumanBehaviorSimulator();
 
             // Initialize proxy manager
             this.proxyManager = new ProxyManager(this.db, this.logger);
@@ -80,6 +84,7 @@ class JobApplicationBot {
             }
 
             this.isRunning = true;
+            this.paused = false;
             this.logger.info('Starting Job Application Bot...');
 
             // Get user profile
@@ -136,6 +141,8 @@ class JobApplicationBot {
 
                 try {
                     // Search for jobs
+                    // Use job boards from criteria if provided (CSV string)
+                    const boards = criteria.job_boards ? criteria.job_boards.split(',').map(s => s.trim()).filter(Boolean) : ['linkedin', 'indeed'];
                     const jobs = await this.jobSearchManager.searchJobs({
                         jobTitle: criteria.job_title,
                         location: criteria.location,
@@ -143,14 +150,14 @@ class JobApplicationBot {
                         keywords: criteria.keywords,
                         salaryMin: criteria.salary_min,
                         salaryMax: criteria.salary_max,
-                        jobBoards: ['linkedin', 'indeed'] // Default to these two
+                        jobBoards: boards
                     });
 
                     this.logger.info(`Found ${jobs.length} jobs to process`);
 
                     // Process each job
                     for (const job of jobs) {
-                        if (!this.isRunning || applicationsSubmitted >= maxApplications) {
+                        if (!this.isRunning || this.paused || applicationsSubmitted >= maxApplications) {
                             break;
                         }
 
@@ -206,7 +213,7 @@ class JobApplicationBot {
                 }
 
                 // Break between different search criteria
-                if (this.isRunning) {
+                if (this.isRunning && !this.paused) {
                     await this.humanSimulator.randomDelay(60000, 300000); // 1-5 minutes
                 }
             }
@@ -230,6 +237,7 @@ class JobApplicationBot {
         try {
             this.logger.info('Stopping Job Application Bot...');
             this.isRunning = false;
+            this.paused = false;
 
             if (this.currentSession) {
                 await this.sessionManager.endSession(this.currentSession.id, 0);
@@ -246,8 +254,11 @@ class JobApplicationBot {
     }
 
     async getStatus() {
+        const state = this.isRunning ? 'running' : (this.paused ? 'paused' : 'stopped');
         return {
             isRunning: this.isRunning,
+            paused: this.paused,
+            state,
             currentUser: this.currentUser ? {
                 id: this.currentUser.id,
                 name: this.currentUser.name,
@@ -292,12 +303,14 @@ class JobApplicationBot {
 
     async pause() {
         this.isRunning = false;
+        this.paused = true;
         this.logger.info('Bot paused');
     }
 
     async resume() {
         if (this.currentUser) {
             this.isRunning = true;
+            this.paused = false;
             this.logger.info('Bot resumed');
         } else {
             throw new Error('No active session to resume');
